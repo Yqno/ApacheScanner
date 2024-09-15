@@ -21,7 +21,7 @@ Options:
   -p PORT, --port PORT  The port number of your Apache HTTP Server (default port is 80)
   -c COMMAND, --command COMMAND
                         The command to be executed on your Apache HTTP Server (default is ls -l)
-  --rce                 Enable remote code execution on your Scan (default is False)
+  --rce                 Scan for remote code execution (default is False)
   --cmd CMD             Command to run if RCE is enabled (default is whoami)
   --lhost LHOST         Attacker IP for reverse shell (required if --rce is enabled)
   --lport LPORT         Attacker listening port for reverse shell (required if --rce is enabled)
