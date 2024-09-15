@@ -21,7 +21,7 @@ Apache HTTP Server scanning and overtaking tool written by Yqno.
 
 Options:
   -h, --help            Show this help message and exit
-  -u URL, --url URL     The target URL of your Apache HTTP Server (default is http://localhost:8080)
+  -u URL, --url URL     The target URL of your Apache HTTP Server (default is http://localhost:80)
   -t TIMEOUT, --timeout TIMEOUT
                         The timeout of the request in seconds (default is 25)
   -p PORT, --port PORT  The port number of your Apache HTTP Server (default port is 80)
